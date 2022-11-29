@@ -1,8 +1,40 @@
 ﻿using System;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace TodoMVC
 {
+    // probably an interface with different implementations for cli/test and production
+    public class PuddleWriter {
+        async Task<byte[]> readPart(String path) {
+            return  new byte[]{};
+        }
+        async Task writeCbor(byte[] data) {
+
+        }
+    }
+    public class Element {
+    }
+    public interface Parser {
+        PuddleVisitor visitor;
+        startElement(Element e){
+        }
+        close(){
+        }
+    }
+    // primarily this is an html like dom, but we need to manage the styles.
+    public interface PuddleVisitor {
+        Map<String, Parser> parser ={};
+        void startWordPart(string path);
+        void startWorkbookPart( );
+        void close();
+        async Task writePart(byte[] data){
+        }
+    }
+    public class PuddleReader {
+        
+        static 
+    }
     public partial class Controller
     {
         private string? _activeRoute;

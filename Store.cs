@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace TodoMVC
 {
@@ -96,14 +97,14 @@ namespace TodoMVC
                 return JsonSerializer.Deserialize(json, ItemListSerializerContext.Default.ListItem) ?? new List<Item>();
             }
 
-            public static void setLocalStorage(List<Item> items)
+            public static async Task setLocalStorage(List<Item> items)
             {
                 var json = JsonSerializer.Serialize(items, ItemListSerializerContext.Default.ListItem);
-                _setLocalStorage(json);
+                await _setLocalStorage(json);
             }
 
             [JSImport("setLocalStorage", "todoMVC/store.js")]
-            internal static partial void _setLocalStorage(string json);
+            internal static partial Task _setLocalStorage(string json);
 
             [JSImport("getLocalStorage", "todoMVC/store.js")]
             internal static partial string _getLocalStorage();
