@@ -10,10 +10,127 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml.Spreadsheet;
 
+// ideally we do something like  
+// context = Context()
+// await do_something(context, )
+//  context.cancel()
+// but wasm fights us on this...
+
+// WasmEnableThreads
+// When we can enable threads, it should be easy! we can do a quick check inside of loops and abandon operations as they are canceled. It might not be worth trying to support without threads. It would take something pretty fancy, like thunks dosome().
+
+// without threads, it's still not too bad; we constantly need to call back to javascript to get parts when we do it gives javascript a chance to tell us to cancel.
+
+
+
+// there is no way to cancel a webworker; https://stackoverflow.com/questions/57365381/how-to-cancel-a-wasm-process-from-within-a-webworker
+// we need allow multiple workers anyway, but this is not the same since they wouldn't share memory
+// for some language runtimes, this potentially can only be single threaded, and not async?
+// how does C# manage multiple threads anyway? you can't start workers from a wasm program
+// there must be some layer over the top.
+
 namespace TodoMVC
 {
+    using Factory = Func<string, dynamic[], WasmTask>;
+
     using D = Dictionary<string, string>;
-    using Dfn = Dictionary<string, Func<Parser>>;
+    using Dfn = Dictionary<string, Func<Parser>>;    
+
+    // WasmTask allows us to use multiple cores, even though only one interfaces to Js.
+    public abstract class WasmTask {
+
+       public CancellationTokenSource? tokenSource;
+
+        public int tag;
+
+        public void reply(int status, dynamic? paramsx){
+            JsServer.reply(tag, status, paramsx);
+        }
+        abstract public  Task  run();
+    }
+    
+    public class ExportTask : WasmTask {
+        public ExportTask(dynamic[] args) {
+            var pr = new PuddleReader();
+        }
+        public override async Task run() {
+             await JsCallback.getPart(tag, "");
+            reply(0,null);
+        }
+    }
+
+
+    
+    public class JsServer
+    {
+        public static Dictionary<int, WasmTask> active = new Dictionary<int, WasmTask> { };
+        public static Dictionary<string, Factory> proc = new Dictionary<string, Factory>{};
+        public static Mutex mutex = new Mutex();
+
+        public static void cancel(int tag){
+            mutex.WaitOne();
+            var t = active[tag];
+            t.tokenSource?.Cancel();
+            active.Remove(tag);
+            mutex.ReleaseMutex();
+        }
+
+        public static void exec(int tag, string method, dynamic[] paramsx)
+        {
+            var factory = proc[method];
+            if (factory==null) {
+                return;
+            }            
+            var task = factory(method,paramsx);   
+            task.tokenSource = new CancellationTokenSource();
+            CancellationToken ct = task.tokenSource.Token;
+
+            // start the task in a thread? How do we cancel it? can any thread call async?
+            task.tag = tag;
+            active[tag] = task;
+
+            Task t = Task.Factory.StartNew(() =>
+            {
+                task.run();
+            });
+        }
+
+        public static void reply(int tag, int status, dynamic? paramsx)
+        {
+            // we need some kind of mutex or queue here before deleting
+            active.Remove(tag);
+
+        }
+
+        // wasm tasks work by reading and writing a pipeline to javascript
+        public static async Task<OoxmlPart> getPart(int readTag, string path)
+        {
+            return new OoxmlPart();
+        }
+        public static async Task callbackWrite(int tag, byte[] data)
+        {
+
+        }    
+    }
+    public class OoxmlServer : JsServer{
+        static int init(){
+            proc["export"] = delegate(string method, dynamic[] args) { return new ExportTask(args); };
+            proc["import"] = delegate(string method, dynamic[] args) { return new ExportTask(args); };            
+            return 0;
+        }
+    }
+    // are untyped arguments a possible lateral movement vector? is there a better way?
+    // does typing them make it harder? type inside or outside or both?
+
+
+
+    public class JsCallback
+    {
+
+
+    }
+
+
 
     public class Parser
     {
@@ -61,37 +178,7 @@ namespace TodoMVC
         }
     }
 
-    public class JsServer
-    {
-        static Dictionary<int, PuddleReader> active = new Dictionary<int, PuddleReader> { };
-        static async Task export(int tag)
-        {
-            var pr = new PuddleReader();
 
-            await JsCallback.getPart(tag, "");
-            JsCallback.status(tag, 1);
-        }
-        static void import(int tag)
-        {
-
-        }
-
-    }
-    public class JsCallback
-    {
-        public static void status(int tag, int status)
-        {
-
-        }
-        public static async Task<OoxmlPart> getPart(int readTag, string path)
-        {
-            return new OoxmlPart();
-        }
-        public static async Task callbackWrite(int tag, byte[] data)
-        {
-
-        }
-    }
     public class OoxmlPart
     {
         int compression;
