@@ -1,40 +1,118 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Features;
+//using DocumentFormat.OpenXml.Office2021.DocumentTasks;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace TodoMVC
 {
-    // probably an interface with different implementations for cli/test and production
-    public class PuddleWriter {
-        async Task<byte[]> readPart(String path) {
-            return  new byte[]{};
+    using D = Dictionary<string, string>;
+    using Dfn = Dictionary<string, Func<Parser>>;
+
+    public class Parser
+    {
+        PuddleReader reader;
+        Parser(PuddleReader r)
+        {
+            this.reader = r;
         }
-        async Task writeCbor(byte[] data) {
+    }
+    // probably an interface with different implementations for cli/test and production
+    public class PuddleWriter
+    {
+        MainDocumentPart part;
+        async Task<byte[]> readPart(String path)
+        {
+            return new byte[] { };
+        }
+        async Task writeCbor(byte[] data)
+        {
 
         }
     }
-    public class Element {
+    public class Element
+    {
+        public string name;
+        Dictionary<string, string> attribute = new Dictionary<string, string> { };
     }
-    public interface Parser {
-        PuddleVisitor visitor;
-        startElement(Element e){
+    public class PuddleReader
+    {
+        Dfn parser = new Dfn();
+
+        int tag = 0;
+
+
+        void startElement(Element e)
+        {
+            var f = parser[e.name];
+            if (f != null)
+            {
+                f();
+            }
         }
-        close(){
+        void close()
+        {
         }
     }
+
+    public class JsServer
+    {
+        static Dictionary<int, PuddleReader> active = new Dictionary<int, PuddleReader> { };
+        static async Task export(int tag)
+        {
+            var pr = new PuddleReader();
+
+            await JsCallback.getPart(tag, "");
+            JsCallback.status(tag, 1);
+        }
+        static void import(int tag)
+        {
+
+        }
+
+    }
+    public class JsCallback
+    {
+        public static void status(int tag, int status)
+        {
+
+        }
+        public static async Task<OoxmlPart> getPart(int readTag, string path)
+        {
+            return new OoxmlPart();
+        }
+        public static async Task callbackWrite(int tag, byte[] data)
+        {
+
+        }
+    }
+    public class OoxmlPart
+    {
+        int compression;
+        byte[] data = new byte[] { };
+    }
+
+
+
     // primarily this is an html like dom, but we need to manage the styles.
-    public interface PuddleVisitor {
-        Map<String, Parser> parser ={};
-        void startWordPart(string path);
-        void startWorkbookPart( );
-        void close();
-        async Task writePart(byte[] data){
+    public abstract class PuddleVisitor
+    {
+        D parser = new D();
+        public abstract void startWordPart(string path);
+        public abstract void startWorkbookPart();
+        public abstract void close();
+
+        async Task writePart(byte[] data)
+        {
         }
     }
-    public class PuddleReader {
-        
-        static 
-    }
+
     public partial class Controller
     {
         private string? _activeRoute;
@@ -65,7 +143,7 @@ namespace TodoMVC
 
         [GeneratedRegex("^#\\/")]
         private static partial Regex GetUrlHashRegex();
-        
+
         public void SetView(string? urlHash)
         {
             var route = GetUrlHashRegex().Replace(urlHash ?? "", "");
